@@ -3,10 +3,10 @@ const { fontFamily } = require('tailwindcss/defaultTheme');
 /** @type {import('tailwindcss').Config} */
 
 module.exports = {
-  content: ['./src/**/*.{js,ts,jsx,tsx}'],
+  content: ['./src/**/*.{js,ts,jsx,tsx}', './.plasmic/**/*.{js,ts,jsx,tsx}'],
   purge: {
     enabled: process.env.NODE_ENV === 'production',
-    content: ['./src/**/*.{js,ts,jsx,tsx}'],
+    content: ['./src/**/*.{js,ts,jsx,tsx}', './.plasmic/**/*.{js,ts,jsx,tsx}'],
     options: {
       safelist: [
         'rtl',
