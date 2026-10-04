@@ -66,6 +66,7 @@ import Card from "../../Card"; // plasmic-import: KIALDnHqraz9/component
 import Paziresh24Button from "../../Paziresh24Button"; // plasmic-import: YOhw5fIQJQgB/component
 import Paziresh24Modal from "../../Paziresh24Modal"; // plasmic-import: ZGdhyEBPJSmH/component
 import { ApiRequest } from "@/common/fragment/components/api-request"; // plasmic-import: RECriOK0iPSM/codeComponent
+import { KhedmatActivation } from "@/modules/hamdast/components/khedmatActivation";
 import { Fetcher } from "@plasmicapp/react-web/lib/data-sources";
 import { _useGlobalVariants } from "./plasmic"; // plasmic-import: 666TdydnqTmUJpihDvjWrt/projectModule
 import { _useStyleTokens } from "./PlasmicStyleTokensProvider"; // plasmic-import: 666TdydnqTmUJpihDvjWrt/styleTokensProvider
@@ -216,28 +217,6 @@ function PlasmicHamdastKhedmatWidget__RenderFunc(props: {
     (__nextRouter?.query?.preview_khedmat === 'true') ||
     (__nextRouter?.query?.preview_khedmat_doctor === 'true')
   );
-
-  const handleActivationClick = async () => {
-    try {
-      await $globalActions["Fragment.apiRequest"]?.apply(null, [
-        "POST",
-        "https://n8n.hosseinzr.ir/webhook/log-webhook",
-        undefined,
-        {
-          event_group: "khedmat_click_activation",
-          doctor_user_id: $props.profileData?.user_id,
-          doctor_slug: $props.profileData?.seo?.slug,
-          user_id: $ctx.auth?.info?.id || currentUserInfo?.id,
-          terminal_id: getCookie("terminal_id")
-        }
-      ]);
-    } catch (e) {
-      console.error("Failed to log activation click:", e);
-    }
-    if (typeof window !== "undefined") {
-      window.open("https://www.paziresh24.com/_/khedmat/launcher/?direct=true", "_blank");
-    }
-  };
 
   const isInactive = Boolean(
     $props.isInactiveView ||
@@ -479,144 +458,15 @@ function PlasmicHamdastKhedmatWidget__RenderFunc(props: {
           })}
         </ScrollContainerComponent>
       ) : null}
-      {isInactive && isOwnDoctor && $state.apiRequest.data?.length > 0 ? (
-        <div
-          style={{
-            position: 'relative',
-            width: '100%',
-            marginTop: '8px',
-            marginBottom: '8px',
-          }}
-        >
-          {/* Real Services purely in Black & White - Crisp, Sharp, Fully Scrollable */}
-          <div
-            style={{
-              filter: 'grayscale(100%)',
-            }}
-          >
-            <ScrollContainerComponent
-              className={classNames("all", sty.freeBox__q8Pqw, isMobile ? "no-scroll" : "")}
-              {...(!isMobile && { hideScrollbars: false })}
-            >
-              {(_par => (!_par ? [] : Array.isArray(_par) ? _par : [_par]))(
-                (() => {
-                  try {
-                    const list = [...($state.apiRequest.data || [])];
-                    return list.sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
-                  } catch (e) {
-                    return $state.apiRequest.data || [];
-                  }
-                })()
-              ).map((currentItem: any, currentIndex: number) => {
-                const isFreeConsultation =
-                  currentItem.consultation === true ||
-                  currentItem.consultation === "true" ||
-                  currentItem.consultalion === true ||
-                  currentItem.consultalion === "true";
-
-                return (
-                  <Card
-                    key={currentIndex}
-                    attributes={currentItem.attributes}
-                    className={classNames("__wab_instance", sty.card)}
-                    buttonText={
-                      isFreeConsultation
-                        ? "\u062f\u0631\u06cc\u0627\u0641\u062a \u0645\u0634\u0627\u0648\u0631\u0647 \u0631\u0627\u06cc\u06af\u0627\u0646 \u0627\u0632 \u062f\u06a9\u062a\u0631"
-                        : undefined
-                    }
-                    imageLink={(() => {
-                      try {
-                        return currentItem.image_link;
-                      } catch (e) {
-                        return undefined;
-                      }
-                    })()}
-                    priceMin={(() => {
-                      try {
-                        return null == currentItem.price_max
-                          ? Number(currentItem.price_min).toLocaleString("en-US")
-                          : currentItem.price_max == null || currentItem.price_max === ""
-                          ? Number(currentItem.price_min).toLocaleString("en-US")
-                          : Number(currentItem.price_min).toLocaleString("en-US") +
-                            " تا " +
-                            Number(currentItem.price_max).toLocaleString("en-US");
-                      } catch (e) {
-                        return undefined;
-                      }
-                    })()}
-                    tiile={(() => {
-                      try {
-                        return currentItem.service;
-                      } catch (e) {
-                        return undefined;
-                      }
-                    })()}
-                  />
-                );
-              })}
-            </ScrollContainerComponent>
-          </div>
-
-          {/* Centered Floating Activation Option - Scroll passes through to cards */}
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 20,
-              pointerEvents: 'none',
-            }}
-          >
-            <button
-              type="button"
-              onClick={handleActivationClick}
-              style={{
-                pointerEvents: 'auto',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                padding: '12px 32px',
-                backgroundColor: '#00966d',
-                color: '#ffffff',
-                fontSize: '15px',
-                fontWeight: '700',
-                borderRadius: '9999px',
-                border: '3px solid #ffffff',
-                boxShadow: '0 8px 24px -2px rgba(0, 0, 0, 0.3), 0 4px 12px -2px rgba(0, 150, 109, 0.4)',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                userSelect: 'none',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#007f5c';
-                e.currentTarget.style.transform = 'scale(1.05)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#00966d';
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-              onMouseDown={(e) => {
-                e.currentTarget.style.transform = 'scale(0.96)';
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform = 'scale(1.05)';
-              }}
-            >
-              <svg
-                style={{ width: '18px', height: '18px', color: '#ffffff', flexShrink: 0 }}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-              </svg>
-              <span>برای فعال‌سازی کلیک کنید</span>
-            </button>
-          </div>
-        </div>
+      {isInactive && isOwnDoctor ? (
+        // ویجت برای بیماران خاموش است: فقط به خود پزشک، کارت فعال‌سازی با پرداخت همین‌جا روی پروفایل.
+        // در حالت isInactiveView (ویجتی روی پروفایل نیست) خودش خدمات را می‌گیرد، چون `/servises`
+        // برای پزشکی که هرگز نخریده و center_id ندارد خالی برمی‌گردد.
+        <KhedmatActivation
+          profileData={$props.profileData}
+          centerId={$props.widgetData?.center_id}
+          services={$props.isInactiveView ? undefined : $state.apiRequest.data}
+        />
       ) : null}
 
       <Paziresh24Modal
