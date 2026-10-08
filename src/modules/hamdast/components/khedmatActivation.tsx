@@ -37,7 +37,6 @@ const FALLBACK_PRICES: Record<string, number> = {
   '13ybb2fnk281zis': 895000,
 };
 
-const BENEFITS = ['نمایش خدمات و تعرفه‌ها به بیماران', 'بیماران از روی خدمات شما نوبت می‌گیرند', 'بهبود رتبه‌ی سرچ در پذیرش۲۴'];
 
 const toFa = (n: number) => Number(n).toLocaleString('fa-IR');
 
@@ -66,12 +65,6 @@ const CheckIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const LockIcon = () => (
-  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="5" y="11" width="14" height="10" rx="2" />
-    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-  </svg>
-);
 
 interface KhedmatActivationProps {
   profileData: Record<string, any>;
@@ -196,62 +189,42 @@ export const KhedmatActivation = ({ profileData, centerId, services: givenServic
   const priceOf = (d: Duration, withBoost: boolean) => prices[PLAN_KEYS[d][withBoost ? 'boost' : 'plain']];
   const boostExtra = priceOf(duration, true) - priceOf(duration, false);
 
-  const copy =
-    variant === 'expired'
-      ? { title: 'نمایش خدمات شما متوقف شده است', button: 'برای فعال‌سازی دوباره کلیک کنید' }
-      : { title: 'نمایش خدمات به بیماران را فعال کنید', button: 'برای فعال‌سازی کلیک کنید' };
+  const buttonText = variant === 'expired' ? 'برای فعال‌سازی دوباره کلیک کنید' : 'برای فعال‌سازی کلیک کنید';
 
   return (
     <>
       {visible && (
-        <div dir="rtl" className="flex gap-[7px] w-full overflow-x-auto no-scroll items-stretch py-1">
-          <div
-            className={classNames('flex flex-col gap-2 shrink-0 w-max min-w-[220px] p-3 rounded-2xl border-[1.5px]', {
-              'border-primary/40 bg-primary/5': variant === 'never_paid',
-              'border-orange-300 bg-orange-50': variant === 'expired',
-            })}
-          >
-            <span className="flex items-center gap-1 text-[10px] text-slate-500">
-              <LockIcon />
-              فقط شما این را می‌بینید
-            </span>
-            <span
-              className={classNames('font-extrabold text-sm leading-6 whitespace-nowrap', {
-                'text-primary': variant === 'never_paid',
-                'text-orange-800': variant === 'expired',
-              })}
-            >
-              {copy.title}
-            </span>
-            {/* کارت هم‌قد کارت‌های خدمت کشیده می‌شود؛ my-auto فضای اضافه را بالا و پایین ویژگی‌ها پخش می‌کند */}
-            <ul className="flex flex-col gap-2.5 my-auto py-1">
-              {BENEFITS.map(benefit => (
-                <li key={benefit} className="flex items-center gap-1.5 text-xs text-slate-800 whitespace-nowrap">
-                  <CheckIcon className="text-green-600 shrink-0" />
-                  {benefit}
-                </li>
+        // طرح اصلی: خدمات واقعی پزشک سیاه‌وسفید و قابل اسکرول، با دکمه‌ی فعال‌سازی شناور وسطشان.
+        // کلیک روی دکمه پاپ‌آپ انتخاب پلن را باز می‌کند و پرداخت همین‌جا روی پروفایل انجام می‌شود.
+        <div dir="rtl" className="relative w-full my-2">
+          <div style={{ filter: 'grayscale(100%)' }}>
+            <div className="flex gap-[7px] w-full overflow-x-auto items-stretch py-1">
+              {sortedServices.map((item, index) => (
+                <div key={item.id ?? index} className="w-[220px] min-w-[220px] shrink-0 pointer-events-none" aria-hidden="true">
+                  <Card
+                    tiile={item.service}
+                    priceMin={formatPrice(item)}
+                    attributes={item.attributes}
+                    // «SUPPORT» نشانه‌ی «عکس توسط پشتیبانی» است، نه آدرس عکس
+                    imageLink={typeof item.image_link === 'string' && item.image_link.startsWith('http') ? item.image_link : undefined}
+                  />
+                </div>
               ))}
-            </ul>
-            <Button size="sm" block onClick={openPlanSheet} loading={isPaying} className="!font-bold">
-              {copy.button}
-            </Button>
-            <button type="button" onClick={() => openEditor('card')} className="text-[11px] font-medium text-primary py-1">
-              ویرایش خدمات
-            </button>
+            </div>
           </div>
 
-          {sortedServices.map((item, index) => (
-            // با رنگ واقعی، دقیقاً همان‌طور که بیمار بعد از فعال‌سازی می‌بیند؛ فقط کلیک‌پذیر نیست.
-            <div key={item.id ?? index} className="w-[220px] min-w-[220px] shrink-0 pointer-events-none" aria-hidden="true">
-              <Card
-                tiile={item.service}
-                priceMin={formatPrice(item)}
-                attributes={item.attributes}
-                // «SUPPORT» نشانه‌ی «عکس توسط پشتیبانی» است، نه آدرس عکس
-                imageLink={typeof item.image_link === 'string' && item.image_link.startsWith('http') ? item.image_link : undefined}
-              />
-            </div>
-          ))}
+          {/* دکمه‌ی شناور؛ لایه‌اش pointer-events ندارد تا اسکرول به کارت‌های زیر برسد */}
+          <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+            <button
+              type="button"
+              onClick={openPlanSheet}
+              disabled={isPaying}
+              className="pointer-events-auto inline-flex items-center justify-center gap-2 px-8 py-3 bg-[#00966d] hover:bg-[#007f5c] text-white text-[15px] font-bold rounded-full border-[3px] border-white shadow-[0_8px_24px_-2px_rgba(0,0,0,0.3),0_4px_12px_-2px_rgba(0,150,109,0.4)] transition-all duration-200 hover:scale-105 active:scale-95 select-none disabled:opacity-70"
+            >
+              <CheckIcon className="w-[18px] h-[18px] shrink-0" />
+              <span>{buttonText}</span>
+            </button>
+          </div>
         </div>
       )}
 
