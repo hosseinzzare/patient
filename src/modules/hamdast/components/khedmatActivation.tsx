@@ -7,6 +7,7 @@ import { useUserInfoStore } from '@/modules/login/store/userInfo';
 import Card from '.plasmic/Card';
 import axios from 'axios';
 import { getCookie } from 'cookies-next';
+import { useRouter } from 'next/router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { HamdastSubscriptionPayment, HamdastSubscriptionPaymentRef } from './subscription-payment';
 
@@ -38,6 +39,74 @@ const FALLBACK_PRICES: Record<string, number> = {
 };
 
 const BENEFITS = ['نمایش خدمات و تعرفه‌ها به بیماران', 'بیماران از روی خدمات شما نوبت می‌گیرند', 'بهبود رتبه‌ی سرچ در پذیرش۲۴'];
+
+// رنگ کارت دعوت. صفحه‌ی پروفایل آبی است و کارت آبی در آن گم می‌شود، پس رنگ‌های متضاد داریم.
+// برای مقایسه روی پروفایل: ?preview_khedmat=true&khedmat_theme=amber|green|dark|violet|blue
+type ThemeName = 'amber' | 'green' | 'dark' | 'violet' | 'blue';
+const DEFAULT_THEME: ThemeName = 'amber';
+const THEMES: Record<ThemeName, { card: string; lock: string; title: string; benefit: string; check: string; button: string; link: string }> = {
+  amber: {
+    card: 'border-amber-300 bg-gradient-to-b from-amber-50 to-orange-100',
+    lock: 'text-amber-800/70',
+    title: 'text-amber-900',
+    benefit: 'text-slate-800',
+    check: 'text-amber-600',
+    button: '!bg-amber-500 hover:!bg-amber-600 !text-white !border-amber-500',
+    link: 'text-amber-800',
+  },
+  green: {
+    card: 'border-emerald-300 bg-gradient-to-b from-emerald-50 to-teal-100',
+    lock: 'text-emerald-800/70',
+    title: 'text-emerald-800',
+    benefit: 'text-slate-800',
+    check: 'text-emerald-600',
+    button: '!bg-emerald-600 hover:!bg-emerald-700 !text-white !border-emerald-600',
+    link: 'text-emerald-800',
+  },
+  dark: {
+    card: 'border-slate-900 bg-gradient-to-b from-slate-800 to-slate-950',
+    lock: 'text-slate-400',
+    title: 'text-white',
+    benefit: 'text-slate-100',
+    check: 'text-amber-400',
+    button: '!bg-amber-400 hover:!bg-amber-300 !text-slate-900 !border-amber-400',
+    link: 'text-amber-300',
+  },
+  violet: {
+    card: 'border-violet-300 bg-gradient-to-b from-violet-50 to-fuchsia-100',
+    lock: 'text-violet-800/70',
+    title: 'text-violet-800',
+    benefit: 'text-slate-800',
+    check: 'text-violet-600',
+    button: '!bg-violet-600 hover:!bg-violet-700 !text-white !border-violet-600',
+    link: 'text-violet-800',
+  },
+  blue: {
+    card: 'border-primary/40 bg-primary/5',
+    lock: 'text-slate-500',
+    title: 'text-primary',
+    benefit: 'text-slate-800',
+    check: 'text-green-600',
+    button: '',
+    link: 'text-primary',
+  },
+};
+// اشتراک تمام‌شده همیشه قرمز است تا با کارت «هرگز نخریده» فرق کند.
+const EXPIRED_THEME = {
+  card: 'border-rose-300 bg-gradient-to-b from-rose-50 to-red-100',
+  lock: 'text-rose-800/70',
+  title: 'text-rose-800',
+  benefit: 'text-slate-800',
+  check: 'text-rose-600',
+  button: '!bg-rose-600 hover:!bg-rose-700 !text-white !border-rose-600',
+  link: 'text-rose-800',
+};
+
+const ChevronIcon = ({ direction }: { direction: 'left' | 'right' }) => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d={direction === 'left' ? 'M15 18l-6-6 6-6' : 'M9 18l6-6-6-6'} />
+  </svg>
+);
 
 const toFa = (n: number) => Number(n).toLocaleString('fa-IR');
 
@@ -101,6 +170,44 @@ export const KhedmatActivation = ({ profileData, centerId, services: givenServic
   const variant: 'never_paid' | 'expired' = subscription?.hadBefore ? 'expired' : 'never_paid';
   const planKey = PLAN_KEYS[duration][boost ? 'boost' : 'plain'];
 
+  const router = useRouter();
+  const requestedTheme = String(router?.query?.khedmat_theme ?? '') as ThemeName;
+  const theme = variant === 'expired' ? EXPIRED_THEME : THEMES[THEMES[requestedTheme] ? requestedTheme : DEFAULT_THEME];
+
+  // ─── اسکرول افقی ردیف کارت‌ها ───
+  // روی دسکتاپ با موس نوار اسکرول (مخفی) و حرکت لمسی نیست؛ پس فلش، کشیدن با موس و چرخ موس هم داریم.
+  // صفحه RTL است: «بعدی» یعنی رفتن به چپ و scrollLeft منفی‌تر.
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ x: number; left: number } | null>(null);
+  const [canPrev, setCanPrev] = useState(false);
+  const [canNext, setCanNext] = useState(false);
+
+  const updateArrows = () => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const offset = Math.abs(el.scrollLeft);
+    setCanPrev(offset > 4);
+    setCanNext(offset + el.clientWidth < el.scrollWidth - 4);
+  };
+
+  const scrollStep = (direction: 1 | -1) => {
+    scrollerRef.current?.scrollBy({ left: -direction * 240, behavior: 'smooth' });
+  };
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== 'mouse' || (e.target as HTMLElement).closest('button')) return;
+    drag.current = { x: e.clientX, left: scrollerRef.current?.scrollLeft ?? 0 };
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = scrollerRef.current;
+    if (!drag.current || !el) return;
+    const dx = e.clientX - drag.current.x;
+    el.scrollLeft = drag.current.left - dx;
+  };
+  const endDrag = () => {
+    drag.current = null;
+  };
+
   const log = (event_group: string, detail?: string) => {
     try {
       fetch(LOG_URL, {
@@ -160,6 +267,26 @@ export const KhedmatActivation = ({ profileData, centerId, services: givenServic
   const visible = !!subscription && !subscription.active && !activated && sortedServices.length > 0;
 
   useEffect(() => {
+    const el = scrollerRef.current;
+    if (!visible || !el) return;
+    updateArrows();
+    // چرخ موس عمودی ردیف را افقی می‌برد؛ وقتی به ته ردیف رسید، صفحه مثل همیشه اسکرول می‌شود.
+    // listener بومی با passive:false لازم است تا preventDefault کار کند.
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      const before = el.scrollLeft;
+      el.scrollLeft -= e.deltaY;
+      if (el.scrollLeft !== before) e.preventDefault();
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('resize', updateArrows);
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      window.removeEventListener('resize', updateArrows);
+    };
+  }, [visible, sortedServices.length]);
+
+  useEffect(() => {
     if (visible && !viewLogged.current) {
       viewLogged.current = true;
       log('khedmat_activation_view', variant);
@@ -204,38 +331,35 @@ export const KhedmatActivation = ({ profileData, centerId, services: givenServic
   return (
     <>
       {visible && (
-        <div dir="rtl" className="flex gap-[7px] w-full overflow-x-auto no-scroll items-stretch py-1">
-          <div
-            className={classNames('flex flex-col gap-2 shrink-0 w-max min-w-[220px] p-3 rounded-2xl border-[1.5px]', {
-              'border-primary/40 bg-primary/5': variant === 'never_paid',
-              'border-orange-300 bg-orange-50': variant === 'expired',
-            })}
-          >
-            <span className="flex items-center gap-1 text-[10px] text-slate-500">
+        <div dir="rtl" className="relative w-full">
+        <div
+          ref={scrollerRef}
+          onScroll={updateArrows}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endDrag}
+          onPointerLeave={endDrag}
+          className="flex gap-[7px] w-full overflow-x-auto no-scroll items-stretch py-1 select-none"
+        >
+          <div className={classNames('flex flex-col gap-2 shrink-0 w-max min-w-[220px] p-3 rounded-2xl border-[1.5px] shadow-sm', theme.card)}>
+            <span className={classNames('flex items-center gap-1 text-[10px]', theme.lock)}>
               <LockIcon />
               فقط شما این را می‌بینید
             </span>
-            <span
-              className={classNames('font-extrabold text-sm leading-6 whitespace-nowrap', {
-                'text-primary': variant === 'never_paid',
-                'text-orange-800': variant === 'expired',
-              })}
-            >
-              {copy.title}
-            </span>
+            <span className={classNames('font-extrabold text-sm leading-6 whitespace-nowrap', theme.title)}>{copy.title}</span>
             {/* کارت هم‌قد کارت‌های خدمت کشیده می‌شود؛ my-auto فضای اضافه را بالا و پایین ویژگی‌ها پخش می‌کند */}
             <ul className="flex flex-col gap-2.5 my-auto py-1">
               {BENEFITS.map(benefit => (
-                <li key={benefit} className="flex items-center gap-1.5 text-xs text-slate-800 whitespace-nowrap">
-                  <CheckIcon className="text-green-600 shrink-0" />
+                <li key={benefit} className={classNames('flex items-center gap-1.5 text-xs whitespace-nowrap', theme.benefit)}>
+                  <CheckIcon className={classNames('shrink-0', theme.check)} />
                   {benefit}
                 </li>
               ))}
             </ul>
-            <Button size="sm" block onClick={openPlanSheet} loading={isPaying} className="!font-bold">
+            <Button size="sm" block onClick={openPlanSheet} loading={isPaying} className={classNames('!font-bold', theme.button)}>
               {copy.button}
             </Button>
-            <button type="button" onClick={() => openEditor('card')} className="text-[11px] font-medium text-primary py-1">
+            <button type="button" onClick={() => openEditor('card')} className={classNames('text-[11px] font-medium py-1', theme.link)}>
               ویرایش خدمات
             </button>
           </div>
@@ -252,6 +376,27 @@ export const KhedmatActivation = ({ profileData, centerId, services: givenServic
               />
             </div>
           ))}
+        </div>
+        {canPrev && (
+          <button
+            type="button"
+            aria-label="خدمات قبلی"
+            onClick={() => scrollStep(-1)}
+            className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/95 shadow-md border border-slate-200 flex items-center justify-center text-slate-700"
+          >
+            <ChevronIcon direction="right" />
+          </button>
+        )}
+        {canNext && (
+          <button
+            type="button"
+            aria-label="خدمات بعدی"
+            onClick={() => scrollStep(1)}
+            className="absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/95 shadow-md border border-slate-200 flex items-center justify-center text-slate-700"
+          >
+            <ChevronIcon direction="left" />
+          </button>
+        )}
         </div>
       )}
 
